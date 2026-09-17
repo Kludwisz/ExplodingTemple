@@ -19,10 +19,5 @@ dependencies {
     implementation("com.seedfinding:mc_reversal:1.171.1")
     implementation("com.seedfinding:mc_feature:1.171.10")
 
-    testImplementation(platform("org.junit:junit-bom:5.10.0"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
-}
-
-tasks.test {
-    useJUnitPlatform()
+    implementation files('lib/profotoce59-1.0-SNAPSHOT.jar')
 }
