@@ -74,8 +74,8 @@ public class LayoutTest {
             gen.generateSuperflatUnchecked(seed, pos.getX(), pos.getZ(), rand);
             generatedCount++;
             var goodGolem = gen.getIronGolems().stream()
-                    .filter(golem -> withinShaftFootprint(golem.minX, golem.minZ)
-                            && withinShaftFootprint(golem.maxX, golem.maxZ))
+                    .filter(golem -> Utils.withinShaftFootprint(golem.minX, golem.minZ)
+                            && Utils.withinShaftFootprint(golem.maxX, golem.maxZ))
                     .findFirst();
 
             if (goodGolem.isPresent()) {
@@ -91,12 +91,5 @@ public class LayoutTest {
         for (var entry : heatmap.entrySet()) {
             System.out.println(entry.getKey() + " : " + entry.getValue());
         }
-    }
-
-    private static boolean withinShaftFootprint(int x, int z) {
-        x &= 15;
-        z &= 15;
-        //System.out.println("check " + x + "," + z);
-        return x >= 9 && x <= 11 && z >= 9 && z <= 11;
     }
 }
