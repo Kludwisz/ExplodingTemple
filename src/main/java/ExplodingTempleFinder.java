@@ -90,6 +90,7 @@ public class ExplodingTempleFinder {
     private final PillagerOutpost outpost = new PillagerOutpost(version);
     private final DesertPyramid temple = new DesertPyramid(version);
     private final OutpostGenerator gen = new OutpostGenerator(version);
+    private final OutpostGolems golems = new OutpostGolems();
 
     private final long seedMin;
     private final long seedMax;
@@ -178,21 +179,23 @@ public class ExplodingTempleFinder {
                 long structureSeed = (baseSeed - regX * RegionSeed.A - regZ * RegionSeed.B) & Mth.MASK_48;
                 int outpostX = outpostPos.getX() + regX * REGION_CHUNKS;
                 int outpostZ = outpostPos.getZ() + regZ * REGION_CHUNKS;
+                // cheapest check first: the weak seed passes 1 in 5, the base plate rotation 1 in 4
+                if (!passesWeakSeedCheck(structureSeed, outpostX, outpostZ)) {
+                    continue;
+                }
                 rand.setCarverSeed(structureSeed, outpostX, outpostZ, version);
                 if (rand.nextInt(4) != rotation) {
                     continue;
                 }
                 CPos shiftedOutpost = new CPos(outpostX, outpostZ);
-                if (!outpostCanStart(structureSeed, shiftedOutpost)) {
+                if (outpost.hasNearbyVillage(structureSeed, outpostX, outpostZ, rand)) {
                     continue;
                 }
 
                 CPos shiftedTemple = templePos.add(regX * REGION_CHUNKS, regZ * REGION_CHUNKS);
 
-                boolean goodPlacement = generateSuperflat(structureSeed, shiftedOutpost) && gen.getIronGolems().stream()
-                        .anyMatch(golem -> isWithinTempleShaft(golem, shiftedTemple));
-
-                if (!goodPlacement || !ravineCarvesBelowShaft(structureSeed, shiftedTemple)) {
+                if (!golemInShaft(structureSeed, shiftedOutpost, shiftedTemple)
+                        || !ravineCarvesBelowShaft(structureSeed, shiftedTemple)) {
                     continue;
                 }
                 ravineCount.incrementAndGet();
@@ -215,12 +218,11 @@ public class ExplodingTempleFinder {
         return Math.floorDiv(maxTempleCoord - shaftCoord, REGION_CHUNKS * 16);
     }
 
-    // the region position is already known to match, so only the weak seed and village checks are left
-    private boolean outpostCanStart(long structureSeed, CPos outpostPos) {
-        rand.setWeakSeed(structureSeed, outpostPos.getX(), outpostPos.getZ(), version);
+    // Besides its region position, an outpost needs this and no village nearby to start
+    private boolean passesWeakSeedCheck(long structureSeed, int outpostX, int outpostZ) {
+        rand.setWeakSeed(structureSeed, outpostX, outpostZ, version);
         rand.nextInt();
-        if (rand.nextInt(5) != 0) return false;
-        return !outpost.hasNearbyVillage(structureSeed, outpostPos.getX(), outpostPos.getZ(), rand);
+        return rand.nextInt(5) == 0;
     }
 
     private static boolean ravineCarvesBelowShaft(long structureSeed, CPos templePos) {
@@ -394,14 +396,10 @@ public class ExplodingTempleFinder {
                 && CubiomesBiomeChecker.isOutpostBiome(biomes.getStructureBiome(outpostPos));
     }
 
-    // OutpostGenerator throws a NullPointerException on a few rare layouts, those are skipped
-    private boolean generateSuperflat(long structureSeed, CPos outpostPos) {
-        try {
-            gen.generateSuperflatUnchecked(structureSeed, outpostPos.getX(), outpostPos.getZ(), rand);
-            return true;
-        } catch (NullPointerException e) {
-            return false;
-        }
+    // whether the outpost, laid out on flat ground, puts a golem in the temple shaft
+    private boolean golemInShaft(long structureSeed, CPos outpostPos, CPos templePos) {
+        int shaftX = (templePos.getX() << 4) + 9, shaftZ = (templePos.getZ() << 4) + 9;
+        return golems.hasGolemIn(structureSeed, outpostPos.getX(), outpostPos.getZ(), shaftX, shaftZ, shaftX + 2, shaftZ + 2);
     }
 
     // generates the outpost on the real terrain and returns the golem that spawns low enough in the shaft to drop
