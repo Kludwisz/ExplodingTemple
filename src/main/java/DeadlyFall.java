@@ -10,15 +10,11 @@ Checks that a player with an empty inventory who digs into the temple shaft afte
 fall into the ravine.
 
 They fall from the temple floor (feet at Y=65). Fall damage is the distance minus 3 against 20 HP, so landing on
-anything at Y<=42 kills them, lava or not. What can save them is water, or something to land on above that. On
-top of that falling straight down lands in lava, with the ravine open for 2 blocks around the middle of the shaft
-all the way down to it.
+anything at Y<=42 kills them, lava or not. What can save them is water, cobwebs, or something to land on above
+that.
  */
 public class DeadlyFall {
     private static final int LAVA_LEVEL = 10;
-    private static final int RAVINE_TOP = 48;
-    private static final int LAVA_POOL_RADIUS = 2;
-    private static final int OPEN_FALL_RADIUS = 2;
     // 65 - 43 = 22 blocks is 19 damage
     private static final int LOWEST_SURVIVABLE_FEET_Y = 43;
     // the TNT at Y=51 blows the cut sandstone chamber (5x5 around the shaft) open down to the ravine
@@ -60,20 +56,30 @@ public class DeadlyFall {
         this.shaftMinZ = (templeChunk.getZ() << 4) + 9;
     }
 
-    // lava under the shaft, and nothing but air between it and the top of the ravine for a few blocks around
-    public boolean hasLavaPoolAndOpenFall() {
-        int radius = Math.max(LAVA_POOL_RADIUS, OPEN_FALL_RADIUS);
-        for (int x = shaftMinX - radius; x <= shaftMinX + 2 + radius; x++) {
-            for (int z = shaftMinZ - radius; z <= shaftMinZ + 2 + radius; z++) {
-                double distance = Math.hypot(x - shaftMinX - 1, z - shaftMinZ - 1);
-                if (distance <= LAVA_POOL_RADIUS && !carve.isCarved(x, LAVA_LEVEL, z)) return false;
-                if (distance > OPEN_FALL_RADIUS) continue;
-                for (int y = LAVA_LEVEL; y <= RAVINE_TOP; y++) {
-                    if (!carve.isCarved(x, y, z)) return false;
-                }
+    // whether falling straight down ends in the lava at the bottom of the ravine rather than on stone
+    public boolean landsInLava() {
+        for (int x = shaftMinX; x <= shaftMinX + 2; x++) {
+            for (int z = shaftMinZ; z <= shaftMinZ + 2; z++) {
+                if (!carve.isCarved(x, LAVA_LEVEL, z)) return false;
             }
         }
         return true;
+    }
+
+    // Solid blocks within reach while the fall is still survivable. None of them has air above it, but the TNT
+    // blows bits out of the walls when it goes off, and any of these could end up as a ledge.
+    public int wallBlocksInReach() {
+        int count = 0;
+        for (int feetY = LOWEST_SURVIVABLE_FEET_Y; feetY <= CRATER_TOP + 2; feetY++) {
+            int range = (int) Math.ceil(REACH[feetY] + PLAYER_HALF_WIDTH) + 2;
+            for (int x = shaftMinX - range; x <= shaftMinX + 2 + range; x++) {
+                for (int z = shaftMinZ - range; z <= shaftMinZ + 2 + range; z++) {
+                    if (distanceToShaft(x, z) > REACH[feetY] + PLAYER_HALF_WIDTH) continue;
+                    if (!isAir(x, feetY - 1, z)) count++;
+                }
+            }
+        }
+        return count;
     }
 
     // nothing within reach to land on high enough to survive the fall
