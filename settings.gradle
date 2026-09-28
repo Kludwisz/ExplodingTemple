@@ -1,1 +1,6 @@
+plugins {
+    // lets Gradle download the JDK 23 the build needs (see build.gradle) when none is installed
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
+
 rootProject.name = "ExplodingTemple"

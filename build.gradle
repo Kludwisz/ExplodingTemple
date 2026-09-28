@@ -6,6 +6,14 @@ plugins {
 group = "com.kris.seedfinding"
 version = "1.0-SNAPSHOT"
 
+// cubiomes needs Java 23, so compile and run with a JDK 23 whatever Java Gradle itself runs on. Gradle uses one that
+// is installed or downloads one (see settings.gradle)
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(23)
+    }
+}
+
 repositories {
     mavenCentral()
     maven { url="https://maven.seedfinding.com" }

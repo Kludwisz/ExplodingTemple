@@ -6,8 +6,10 @@ an empty inventory. The seeds found so far, and how they were tested, are in [SE
 
 ## Searching for seeds
 
-Needs Java 23 (for example Temurin 23 from https://adoptium.net), since the cave library the finder uses calls
-native code through Java's foreign function API. The first run downloads Gradle and the libraries.
+The cave library the finder uses calls native code through Java's foreign function API and needs Java 23. Gradle
+itself runs on whatever Java you have (8 to 23, so the Java 21 of a Minecraft server is fine) and compiles and runs
+the finder with a JDK 23: one that is installed, or else one it downloads by itself (about 200 MB, once). The first
+run also downloads Gradle and the libraries.
 
 ```
 gradlew.bat run --args="4131000000000 281474976710656 300"      (Windows)
