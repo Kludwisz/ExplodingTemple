@@ -5,20 +5,21 @@
 In these worlds the desert temple blows itself up. A pillager outpost's iron golem is placed inside the
 temple's hidden shaft, drops onto the pressure plate and sets off the TNT. The explosion opens the shaft into
 a ravine with a lava lake at the bottom. A player with an empty inventory who breaks through the temple
-floor falls about 55 blocks, and every spot they can steer to in the air kills them.
+floor falls about 55 blocks. In about 3 out of 4 new worlds, every spot they can steer to in the air kills
+them. The explosion is random, see [How often the fall is deadly](#how-often-the-fall-is-deadly).
 
-| Seed | World spawn | Temple shaft | Distance | Test world |
-|---|---|---|---|---|
-| `-8984679548996753866` | 256 71 -256 | 298 -486 | 234 blocks | deadly |
-| `-7573926965722945994` | 240 69 -256 | 298 -486 | 237 blocks | deadly |
-| `-1215407241829226954` | 224 64 -256 | 298 -486 | 242 blocks | deadly |
-| `-1402588101341813194` | 224 63 -256 | 298 -486 | 242 blocks | deadly |
-| `2344969738583860790` | 224 69 -256 | 298 -486 | 242 blocks | deadly |
-| `9118665053125797430` | 224 64 -256 | 298 -486 | 242 blocks | deadly |
-| `-5340141550547179978` | 208 64 -256 | 298 -486 | 247 blocks | deadly |
-| `4083359194748872246` | 208 64 -256 | 298 -486 | 247 blocks | deadly |
-| `-3798784578079627722` | 256 78 -240 | 298 -486 | 250 blocks | deadly |
-| `2112471407820858934` | 240 68 -192 | 298 -486 | 300 blocks | deadly |
+| Seed | World spawn | Temple shaft | Distance |
+|---|---|---|---|
+| `-8984679548996753866` | 256 71 -256 | 298 -486 | 234 blocks |
+| `-7573926965722945994` | 240 69 -256 | 298 -486 | 237 blocks |
+| `-1215407241829226954` | 224 64 -256 | 298 -486 | 242 blocks |
+| `-1402588101341813194` | 224 63 -256 | 298 -486 | 242 blocks |
+| `2344969738583860790` | 224 69 -256 | 298 -486 | 242 blocks |
+| `9118665053125797430` | 224 64 -256 | 298 -486 | 242 blocks |
+| `-5340141550547179978` | 208 64 -256 | 298 -486 | 247 blocks |
+| `4083359194748872246` | 208 64 -256 | 298 -486 | 247 blocks |
+| `-3798784578079627722` | 256 78 -240 | 298 -486 | 250 blocks |
+| `2112471407820858934` | 240 68 -192 | 298 -486 | 300 blocks |
 
 All of them are sister seeds of structure seed `1707607385654`, found from base seed `1574709398113` with
 `Main 1574709398113 1574709398114 300`, which lists 55 sister seeds with the spawn 234 to 300 blocks from
@@ -28,20 +29,28 @@ is outside the spawn chunks, so it goes off when a player first comes within sim
 Each seed was generated in the vanilla 1.16.1 server, with the 9x9 chunks around the temple force-loaded
 for 45 seconds so the golem drops and spring water has time to flow. Then the saved world was scanned.
 The TNT was gone. Under the shaft is a lava lake of 280 blocks, with lava under all of the shaft and at
-least 3 blocks around it. A falling player can't reach any water or cobweb, or anywhere at Y 43 or higher to
-land on.
+least 3 blocks around it. No water or cobweb got anywhere a falling player can reach.
 
-**The explosion is different in every new world.** Primed TNT gets knocked into the ravine and goes off at
-different heights. Of 14 test worlds made from these sister seeds, 9 were deadly as above. In the other 5
-the TNT left a ledge:
+### How often the fall is deadly
 
-- twice, a wall block right next to the shaft that is easy to land on;
-- three times, a ledge chipped into the ravine wall about 2.2 blocks from the shaft at Y 43, which only a
-  perfect diagonal fall could just reach.
+**The explosion is different in every new world.** The pressure plate only sets off the TNT in the middle.
+That explosion knocks the other 8 into the ravine, and they go off at random heights on the way down, so
+every new world gets its own crater.
 
-The seeds marked deadly were deadly in their test world, but a new world made from them can still get one
-of those ledges. Each new world gets its own explosion, so if it matters, look at the crater under the
-floor first.
+To measure this, the temple was generated in the vanilla server with its chunks loaded but not ticking, so
+the golem hadn't dropped yet, and the world was saved. Then the temple was blown up 30 times, restoring the
+saved world before each explosion, and the crater was scanned each time. The fall was deadly after 25 of
+the 30 explosions, and in 9 of 14 freshly generated test worlds. Each time it wasn't, a player strafing
+perfectly in the air could just reach one of these:
+
+- a block of ravine wall the TNT chipped at Y 42 or 43, about 2.2 blocks diagonally from the shaft (5 times);
+- a ledge 2 to 3 blocks away at Y 43 to 50, a step in the ravine wall or chipped by the TNT. Those are only
+  in reach when the explosion also blows the shaft open up to Y 57 or higher, which lets the player start
+  steering sooner (3 times);
+- a block of the TNT chamber left right next to the shaft (twice).
+
+So about 3 out of 4 new worlds made from these seeds are deadly. If it matters, look at the crater under
+the floor first.
 
 ### Why the fall is deadly
 
@@ -55,8 +64,12 @@ floor first.
 
 The finder checks everything in that reach:
 
-- lava at Y=10 and open air up to Y=48 for 2 blocks around the middle of the shaft;
-- no ledge at Y 43 or higher;
+- nothing to land on at Y 43 or higher. Below that, lava and stone kill alike, so the shaft doesn't have to
+  end in lava;
+- at most 5 blocks of ravine wall in reach between Y 42 and 49, below the crater. The TNT that falls into
+  the ravine blows holes into walls that close, and the bottom of every hole is a new ledge. Temples with
+  more of them got a ledge in reach from nearly every explosion: 0 of 13 explosions were deadly at the
+  temple in chunk -32 -18, which has 39 such blocks. These seeds have 4;
 - no mineshaft (cobwebs, planks);
 - no water. Water springs are placed exactly as the game does, and their flow is simulated over the caves
   and ravines within 4 chunks of the temple. Spring water flooded the ravines under all the earlier seeds
