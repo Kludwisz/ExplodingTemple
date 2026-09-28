@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.function.ToIntFunction;
 
 /*
@@ -87,48 +89,91 @@ public class WaterSprings {
     }
 
     /*
-    Everywhere the springs' water can end up. Water falls while there is air below, otherwise it spreads 7 blocks
-    sideways through air, and lava it touches turns into obsidian it can flow over. Vanilla only spreads towards the
-    nearest drop within 4 blocks, spreading every way instead only makes this cover more.
+    Where the springs' water ends up, following FlowingFluid: water falls while it can, and where it can't it spreads
+    sideways with one level less per block (7 blocks from a spring or from where it lands), but only towards the
+    nearest spot within 4 blocks where it can fall again - every way if there is none. Lava it lands on turns into
+    obsidian it spreads over. Returns every water block with how far it could still spread.
      */
     public static Map<BPos, Integer> flow(List<BPos> springs, CarveRegion carve) {
         Map<BPos, Integer> water = new HashMap<>();
         ArrayDeque<BPos> queue = new ArrayDeque<>();
-        for (BPos spring : springs) {
-            water.put(spring, MAX_SPREAD);
-            queue.add(spring);
-        }
+        Set<BPos> sources = new HashSet<>(springs);
         // water that was already there (from the terrain, or the underwater carvers in ocean chunks) flows into
         // any carved air next to it once something updates it, so it counts as a source as well
-        carve.forEachWater((x, y, z) -> {
-            BPos pos = new BPos(x, y, z);
-            water.put(pos, MAX_SPREAD);
-            queue.add(pos);
-        });
+        carve.forEachWater((x, y, z) -> sources.add(new BPos(x, y, z)));
+        for (BPos source : sources) {
+            water.put(source, MAX_SPREAD + 1);
+            queue.add(source);
+        }
 
         while (!queue.isEmpty()) {
             BPos pos = queue.poll();
-            int spread = water.get(pos);
+            int amount = water.get(pos);
             BPos below = pos.add(0, -1, 0);
-            if (isAir(carve, below.getX(), below.getY(), below.getZ())) {
-                offer(water, queue, below, MAX_SPREAD);
-                continue;
+            if (canHold(carve, below)) {
+                // falling water spreads 7 blocks again where it lands
+                if (!sources.contains(below)) offer(water, queue, below, MAX_SPREAD + 1);
+                if (!sources.contains(pos)) continue;
             }
-            if (spread == 0) continue;
+            int spread = amount - 1;
+            if (spread <= 0) continue;
 
-            for (BPos side : new BPos[]{pos.add(-1, 0, 0), pos.add(1, 0, 0), pos.add(0, 0, -1), pos.add(0, 0, 1)}) {
-                if (isAir(carve, side.getX(), side.getY(), side.getZ())) {
-                    offer(water, queue, side, spread - 1);
+            int nearest = Integer.MAX_VALUE;
+            List<BPos> targets = new ArrayList<>(4);
+            for (int[] side : SIDES) {
+                BPos next = pos.add(side[0], 0, side[1]);
+                if (!canPassThrough(carve, sources, next)) continue;
+                int distance = isHole(carve, next) ? 0 : slopeDistance(carve, sources, next, 1, side);
+                if (distance < nearest) {
+                    nearest = distance;
+                    targets.clear();
                 }
+                if (distance == nearest) targets.add(next);
+            }
+            for (BPos target : targets) {
+                offer(water, queue, target, spread);
             }
         }
         return water;
     }
 
-    private static void offer(Map<BPos, Integer> water, ArrayDeque<BPos> queue, BPos pos, int spread) {
+    private static final int[][] SIDES = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+    private static final int SLOPE_FIND_DISTANCE = 4;
+
+    // FlowingFluid#getSlopeDistance: steps to the nearest spot the water can fall from, not going back the way it came
+    private static int slopeDistance(CarveRegion carve, Set<BPos> sources, BPos pos, int depth, int[] cameFrom) {
+        int nearest = 1000;
+        for (int[] side : SIDES) {
+            if (side[0] == -cameFrom[0] && side[1] == -cameFrom[1]) continue;
+            BPos next = pos.add(side[0], 0, side[1]);
+            if (!canPassThrough(carve, sources, next)) continue;
+            if (isHole(carve, next)) return depth;
+            if (depth >= SLOPE_FIND_DISTANCE) continue;
+            nearest = Math.min(nearest, slopeDistance(carve, sources, next, depth + 1, side));
+        }
+        return nearest;
+    }
+
+    // air water can flow into (lava below Y=11 counts, it turns into obsidian or stone), but not a source block
+    private static boolean canPassThrough(CarveRegion carve, Set<BPos> sources, BPos pos) {
+        return canHold(carve, pos) && !sources.contains(pos);
+    }
+
+    private static boolean canHold(CarveRegion carve, BPos pos) {
+        int x = pos.getX(), y = pos.getY(), z = pos.getZ();
+        return carve.isCarved(x, y, z) && y > LAVA_LEVEL || carve.isWater(x, y, z);
+    }
+
+    // water next to this spot would fall into it
+    private static boolean isHole(CarveRegion carve, BPos pos) {
+        BPos below = pos.add(0, -1, 0);
+        return canHold(carve, below) || carve.isCarved(below.getX(), below.getY(), below.getZ());
+    }
+
+    private static void offer(Map<BPos, Integer> water, ArrayDeque<BPos> queue, BPos pos, int amount) {
         Integer known = water.get(pos);
-        if (known == null || known < spread) {
-            water.put(pos, spread);
+        if (known == null || known < amount) {
+            water.put(pos, amount);
             queue.add(pos);
         }
     }
