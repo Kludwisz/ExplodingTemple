@@ -11,13 +11,14 @@ fall into the ravine.
 
 They fall from the temple floor (feet at Y=65). Fall damage is the distance minus 3 against 20 HP, so landing on
 anything at Y<=42 kills them, lava or not. What can save them is water, or something to land on above that. On
-top of that the lava pool under the shaft has to be big and the ravine walls far from it.
+top of that falling straight down lands in lava, with the ravine open for 2 blocks around the middle of the shaft
+all the way down to it.
  */
 public class DeadlyFall {
     private static final int LAVA_LEVEL = 10;
     private static final int RAVINE_TOP = 48;
-    private static final int LAVA_POOL_RADIUS = 3;
-    private static final int OPEN_FALL_RADIUS = 3;
+    private static final int LAVA_POOL_RADIUS = 2;
+    private static final int OPEN_FALL_RADIUS = 2;
     // 65 - 43 = 22 blocks is 19 damage
     private static final int LOWEST_SURVIVABLE_FEET_Y = 43;
     // the TNT at Y=51 blows the cut sandstone chamber (5x5 around the shaft) open down to the ravine

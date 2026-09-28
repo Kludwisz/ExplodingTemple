@@ -56,9 +56,6 @@ public class ExplodingTempleFinder {
     // is the first free block above the surface (water counts), so it only drops into the shaft when the
     // cage origin is at Y<=63: its feet start inside the floor block, which doesn't stop it falling.
     private static final int MAX_GOLEM_CAGE_Y = 63;
-    // The terrain noise only depends on the structure seed, so if the golem spawns too high for this many
-    // sister seeds with the right biomes, it almost certainly does for all of them.
-    private static final int TERRAIN_PROBES = 64;
     // caves, ravines and water springs are modelled this many chunks around the temple, water from springs
     // further away would have to flow ~60 blocks along the ravine to reach it
     private static final int CARVE_CHUNK_RADIUS = 4;
@@ -66,6 +63,9 @@ public class ExplodingTempleFinder {
     // footprint from Y=59 down through air and liquid
     private static final int PYRAMID_SIZE = 21;
     private static final int PYRAMID_FILL_TOP = 59;
+
+    // outposts and desert pyramids both have one attempt per 32x32 chunk region
+    private static final int REGION_CHUNKS = 32;
 
     private static final long LCG_MULTIPLIER = 0x5DEECE66DL;
     private static final long LCG_ADDEND = 0xBL;
@@ -82,7 +82,6 @@ public class ExplodingTempleFinder {
     private final long seedMax;
     private final int maxSpawnDistance;
     private final int maxTempleCoord;
-    private final int regionRadius;
 
     public ExplodingTempleFinder(long seedMin, long seedMax, int maxSpawnDistance) {
         this.seedMin = seedMin;
@@ -90,7 +89,6 @@ public class ExplodingTempleFinder {
         this.maxSpawnDistance = maxSpawnDistance;
         // no temple further out than this can be within maxSpawnDistance of the spawn
         this.maxTempleCoord = SPAWN_SEARCH_RADIUS + maxSpawnDistance;
-        this.regionRadius = maxTempleCoord / (32 * 16) + 1;
     }
 
     public void run() {
@@ -99,52 +97,62 @@ public class ExplodingTempleFinder {
 
         try (CubiomesBiomeChecker biomes = new CubiomesBiomeChecker()) {
             for (long baseSeed = seedMin; baseSeed < seedMax; baseSeed++) {
-                // positions in region (0,0) without the outpost start checks - those depend on the region
-                // shift, so they are only checked for the shifted seeds
-                int outpostPos = regionOffset(baseSeed, outpostSalt);
-                int templePos = regionOffset(baseSeed, templeSalt);
-                if (outpostPos < 0 || templePos < 0) continue;
+                // Positions in region (0,0) without the outpost start checks - those depend on the region shift,
+                // so they are only checked for the shifted seeds. Same as rand.setRegionSeed(baseSeed, 0, 0, salt,
+                // version) followed by nextInt(24) for x and z, inlined as this runs for every base seed, with x
+                // compared first as most seeds already fail there.
+                long outpostState = nextState((baseSeed + outpostSalt ^ LCG_MULTIPLIER) & Mth.MASK_48);
+                long templeState = nextState((baseSeed + templeSalt ^ LCG_MULTIPLIER) & Mth.MASK_48);
+                int outpostX = nextInt24(outpostState);
+                int templeX = nextInt24(templeState);
+                int offsetX = templeX - outpostX;
+                if (outpostX < 0 || templeX < 0 || offsetX < -2 || offsetX > 2) continue;
 
-                int offsetX = (templePos >> 8) - (outpostPos >> 8);
-                int offsetZ = (templePos & 0xFF) - (outpostPos & 0xFF);
-                if (offsetX < -2 || offsetX > 2 || offsetZ < -2 || offsetZ > 2
+                outpostState = nextState(outpostState);
+                templeState = nextState(templeState);
+                int outpostZ = nextInt24(outpostState);
+                int templeZ = nextInt24(templeState);
+                int offsetZ = templeZ - outpostZ;
+                if (outpostZ < 0 || templeZ < 0 || offsetZ < -2 || offsetZ > 2
                         || GOLEM_ROTATION[offsetX + 2][offsetZ + 2] < 0) { continue; }
 
-                CPos outpostChunk = new CPos(outpostPos >> 8, outpostPos & 0xFF);
+                CPos outpostChunk = new CPos(outpostX, outpostZ);
                 checkRegionShifts(baseSeed, outpostChunk, outpostChunk.add(offsetX, offsetZ),
                         GOLEM_ROTATION[offsetX + 2][offsetZ + 2], biomes);
             }
         }
     }
 
-    // Same as rand.setRegionSeed(baseSeed, 0, 0, salt, version) followed by two nextInt(24) calls, inlined as
-    // this runs for every base seed. Returns x << 8 | z, or -1 in the ~1e-8 case where nextInt would re-roll.
-    private static int regionOffset(long baseSeed, int salt) {
-        long seed = (baseSeed + salt ^ LCG_MULTIPLIER) & Mth.MASK_48;
-        seed = seed * LCG_MULTIPLIER + LCG_ADDEND & Mth.MASK_48;
-        int x = (int) (seed >>> 17);
-        seed = seed * LCG_MULTIPLIER + LCG_ADDEND & Mth.MASK_48;
-        int z = (int) (seed >>> 17);
-        if (x >= NEXT_INT_24_REROLL || z >= NEXT_INT_24_REROLL) return -1;
-        return x % 24 << 8 | z % 24;
+    // one step of the java.util.Random LCG
+    private static long nextState(long state) {
+        return state * LCG_MULTIPLIER + LCG_ADDEND & Mth.MASK_48;
+    }
+
+    // nextInt(24) for the state, or -1 in the ~1e-8 case where it would re-roll
+    private static int nextInt24(long state) {
+        int bits = (int) (state >>> 17);
+        return bits >= NEXT_INT_24_REROLL ? -1 : bits % 24;
     }
 
     // shifting the structure seed by whole regions moves the structures by whole regions, so only the
     // few regions around the origin are checked - anything further away can't be near the world spawn
     private void checkRegionShifts(long baseSeed, CPos outpostPos, CPos templePos, int rotation, CubiomesBiomeChecker biomes) {
-        for (int regX = -regionRadius; regX <= regionRadius; regX++) {
-            for (int regZ = -regionRadius; regZ <= regionRadius; regZ++) {
-                CPos shiftedTemple = templePos.add(regX * 32, regZ * 32);
-                if (!mayBeNearSpawn(shiftedTemple)) {
+        BPos shaft = templeShaftCenter(templePos);
+        for (int regX = minRegionShift(shaft.getX()); regX <= maxRegionShift(shaft.getX()); regX++) {
+            for (int regZ = minRegionShift(shaft.getZ()); regZ <= maxRegionShift(shaft.getZ()); regZ++) {
+                long structureSeed = (baseSeed - regX * RegionSeed.A - regZ * RegionSeed.B) & Mth.MASK_48;
+                int outpostX = outpostPos.getX() + regX * REGION_CHUNKS;
+                int outpostZ = outpostPos.getZ() + regZ * REGION_CHUNKS;
+                rand.setCarverSeed(structureSeed, outpostX, outpostZ, version);
+                if (rand.nextInt(4) != rotation) {
+                    continue;
+                }
+                CPos shiftedOutpost = new CPos(outpostX, outpostZ);
+                if (!outpostCanStart(structureSeed, shiftedOutpost)) {
                     continue;
                 }
 
-                long structureSeed = (baseSeed - regX * RegionSeed.A - regZ * RegionSeed.B) & Mth.MASK_48;
-                CPos shiftedOutpost = outpostPos.add(regX * 32, regZ * 32);
-                rand.setCarverSeed(structureSeed, shiftedOutpost.getX(), shiftedOutpost.getZ(), version);
-                if (rand.nextInt(4) != rotation || !outpostCanStart(structureSeed, shiftedOutpost)) {
-                    continue;
-                }
+                CPos shiftedTemple = templePos.add(regX * REGION_CHUNKS, regZ * REGION_CHUNKS);
 
                 boolean goodPlacement = generateSuperflat(structureSeed, shiftedOutpost) && gen.getIronGolems().stream()
                         .anyMatch(golem -> isWithinTempleShaft(golem, shiftedTemple));
@@ -176,9 +184,13 @@ public class ExplodingTempleFinder {
         }
     }
 
-    private boolean mayBeNearSpawn(CPos templeChunk) {
-        BPos shaft = templeShaftCenter(templeChunk);
-        return Math.abs(shaft.getX()) <= maxTempleCoord && Math.abs(shaft.getZ()) <= maxTempleCoord;
+    // the first and last region shift that keep the temple shaft within maxTempleCoord of the origin on one axis
+    private int minRegionShift(int shaftCoord) {
+        return Math.ceilDiv(-maxTempleCoord - shaftCoord, REGION_CHUNKS * 16);
+    }
+
+    private int maxRegionShift(int shaftCoord) {
+        return Math.floorDiv(maxTempleCoord - shaftCoord, REGION_CHUNKS * 16);
     }
 
     // the region position is already known to match, so only the weak seed and village checks are left
@@ -222,9 +234,6 @@ public class ExplodingTempleFinder {
             return;
         }
         dryStructureSeedCount.incrementAndGet();
-        if (!golemDropsInSomeSisterSeed(structureSeed, outpostPos, templePos, biomes)) {
-            return;
-        }
 
         BPos shaft = templeShaftCenter(templePos);
         for (long upperBits = 0; upperBits < 1L << 16; upperBits++) {
@@ -299,23 +308,6 @@ public class ExplodingTempleFinder {
                 return fall.staysDry(WaterSprings.flow(springs, carve));
             });
         }
-    }
-
-    private boolean golemDropsInSomeSisterSeed(long structureSeed, CPos outpostPos, CPos templePos, CubiomesBiomeChecker biomes) {
-        int probes = 0;
-        for (long upperBits = 0; upperBits < 1L << 16 && probes < TERRAIN_PROBES; upperBits++) {
-            long worldSeed = upperBits << 48 | structureSeed;
-            if (!hasStructureBiomes(worldSeed, outpostPos, templePos, biomes)) {
-                continue;
-            }
-
-            probes++;
-            TerrainGenerator otg = TerrainGenerator.of(BiomeSource.of(Dimension.OVERWORLD, version, worldSeed));
-            if (findDroppingGolem(otg, outpostPos, templePos).isPresent()) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static boolean hasStructureBiomes(long worldSeed, CPos outpostPos, CPos templePos, CubiomesBiomeChecker biomes) {

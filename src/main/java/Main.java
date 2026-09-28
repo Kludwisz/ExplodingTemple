@@ -9,7 +9,7 @@ public class Main {
     public static void main(String[] args) throws InterruptedException {
         long seedMin = args.length > 0 ? Long.parseLong(args[0]) : 0L;
         long seedMax = args.length > 1 ? Long.parseLong(args[1]) : 1L << 40;
-        int maxSpawnDistance = args.length > 2 ? Integer.parseInt(args[2]) : 128;
+        int maxSpawnDistance = args.length > 2 ? Integer.parseInt(args[2]) : 300;
         int threads = args.length > 3 ? Integer.parseInt(args[3]) : Runtime.getRuntime().availableProcessors();
 
         System.out.printf("base seeds [%d, %d), temple within %d blocks of spawn, %d threads%n",
