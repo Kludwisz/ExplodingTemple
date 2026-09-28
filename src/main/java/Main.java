@@ -53,8 +53,9 @@ public class Main {
 
     private static void printProgress(long t0, long seedsDone) {
         double elapsedSecs = (System.nanoTime() - t0) * 1e-9;
-        System.out.printf("[progress] %d base seeds in %.0fs (%.2fM/s), %d structure seeds, %d world seeds%n",
-                seedsDone, elapsedSecs, seedsDone / elapsedSecs / 1e6,
-                ExplodingTempleFinder.structureSeedCount.get(), ExplodingTempleFinder.resultCount.get());
+        System.out.printf("[progress] %d base seeds in %.0fs (%.2fM/s), %d ravines, %d deadly structure seeds (%d dry), %d world seeds%n",
+                seedsDone, elapsedSecs, seedsDone / elapsedSecs / 1e6, ExplodingTempleFinder.ravineCount.get(),
+                ExplodingTempleFinder.structureSeedCount.get(), ExplodingTempleFinder.dryStructureSeedCount.get(),
+                ExplodingTempleFinder.resultCount.get());
     }
 }
