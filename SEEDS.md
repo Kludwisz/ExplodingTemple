@@ -5,11 +5,13 @@
 In these worlds the desert temple blows itself up. A pillager outpost's iron golem is placed inside the
 temple's hidden shaft, drops onto the pressure plate and sets off the TNT. The explosion opens the shaft into
 a ravine with a lava lake at the bottom. A player with an empty inventory who breaks through the temple
-floor falls about 55 blocks, and every spot they can steer to in the air kills them. The explosion is random
-though, and at the second temple below it leaves something to land on in about 1 out of 4 new worlds, see
-[How often the fall is deadly](#how-often-the-fall-is-deadly).
+floor falls about 55 blocks.
 
-### Temple at -198 170: deadly in every test
+The explosion is random, so every new world gets its own crater, and whether it leaves anything to land on
+depends on it. How often each temple stays deadly was measured by blowing it up again and again in the
+vanilla server, see [Testing](#testing).
+
+### Temple at -198 170: deadly after 98 of 100 explosions
 
 | Seed | World spawn | Temple shaft | Distance |
 |---|---|---|---|
@@ -23,19 +25,24 @@ though, and at the second temple below it leaves something to land on in about 1
 | `-1121955852008972070` | 0 74 13 | -198 170 | 253 blocks |
 
 All of them are sister seeds of structure seed `3405159702746`, found from base seed `3063286574034` with
-`Main 3063286574034 3063286574035 300`, which lists 314 sister seeds with the spawn within 300 blocks of the
-temple. They share the temple, the outpost and the ravine; biomes and the spawn point differ.
-
-Under the crater the ravine is wide open. Its walls are at least 4 blocks from the shaft down to Y 40, and
-there are no wall blocks in reach below the crater for the TNT to chip into ledges. There is lava under all
-of the shaft and at least 2 blocks around it, part of a lava lake of about 290 blocks. The fall was deadly
-in all 8 test worlds and after all 20 test explosions.
+`Main 3063286574034 3063286574035 300` in an earlier version of the finder (commit `4b2acd7`), which lists 314
+sister seeds with the spawn within 300 blocks of the temple. They share the temple, the outpost and the ravine;
+biomes and the spawn point differ. Under the shaft is a lava lake of about 290 blocks.
 
 For the first seed the finder estimated the spawn 238 blocks away, but the game puts it 149 blocks from the
 temple. That is inside the spawn chunks, so the temple blows up as soon as the world is created. In the other
 worlds it goes off when a player first comes within simulation distance of it.
 
-### Temple at 298 -486: deadly in about 3 out of 4 new worlds
+The ravine is wide open under the TNT chamber. There is no rock anywhere a player could steer to below it,
+and the rock around the chamber only starts at Y 51 with the ravine underneath, so the explosion has nothing
+to chip into a ledge. Both times the fall wasn't deadly, gravel the explosion shook loose from a deposit next
+to the chamber fell onto a ledge in the ravine wall at Y 39, two blocks east of the shaft, and piled up 3 high.
+The top of the pile, at Y 42, is just high enough to survive landing on, with half a heart left, and a player
+strafing toward it could reach it. Otherwise, in the last 80 explosions where it was measured, the nearest
+spot to land on stayed at least 0.17 blocks out of reach. The fall was also deadly in all 8 freshly generated
+test worlds.
+
+### Temple at 298 -486: deadly in about 3 out of 4 worlds
 
 | Seed | World spawn | Temple shaft | Distance |
 |---|---|---|---|
@@ -51,63 +58,55 @@ worlds it goes off when a player first comes within simulation distance of it.
 | `2112471407820858934` | 240 68 -192 | 298 -486 | 300 blocks |
 
 All of them are sister seeds of structure seed `1707607385654`, found from base seed `1574709398113` with
-`Main 1574709398113 1574709398114 300`, which lists 55 sister seeds with the spawn 234 to 300 blocks from
-the temple. The temple is outside the spawn chunks, so it goes off when a player first comes within
-simulation distance of it.
+`Main 1574709398113 1574709398114 300` in an earlier version of the finder (commit `4b2acd7`), which lists 55
+sister seeds with the spawn 234 to 300 blocks from the temple. The temple is outside the spawn chunks, so it
+goes off when a player first comes within simulation distance of it. Under the shaft is a lava lake of 280
+blocks.
 
-Under the shaft is a lava lake of 280 blocks, with lava under all of the shaft and at least 3 blocks around
-it. Every seed in the table was deadly in its test world, but the explosion left a ledge in reach in 5 of
-14 test worlds made from sister seeds, and after 5 of 30 test explosions.
+Here the ravine walls come within reach just below the crater, where the loose TNT goes off, and there is
+rock around the chamber at Y 50. The explosion left something in reach after 5 of 30 test explosions and in
+5 of 14 freshly generated worlds. Every seed in the table was deadly in its own test world, but a new world
+gets its own explosion. The spots a perfect strafer could reach were:
 
-### Test worlds
+- a block of ravine wall the TNT chipped at Y 42 or 43, about 2.2 blocks diagonally from the shaft (5 times);
+- a ledge 2 to 3 blocks away at Y 43 to 50, a step in the ravine wall or chipped by the TNT, in reach because
+  the explosion also blew the shaft open up to Y 57 or 58 (3 times);
+- a block of the TNT chamber left right next to the shaft (twice).
+
+### Testing
 
 Each seed in both tables was generated in the vanilla 1.16.1 server, with the 9x9 chunks around the temple
 force-loaded for 45 seconds so the golem drops and spring water has time to flow. Then the saved world was
 scanned. The TNT was gone, and no water or cobweb got anywhere a falling player can reach.
 
-### How often the fall is deadly
+To see how often the explosion leaves something to land on, each temple was also generated with its chunks
+loaded but not ticking, so the golem hadn't dropped yet, and the world was saved. Then the temple was blown
+up again and again, restoring that save before each explosion, and every crater was scanned for anything a
+player falling down the shaft could reach while strafing perfectly in the air.
 
-**The explosion is different in every new world.** The pressure plate only sets off the TNT in the middle.
-That explosion knocks the other 8 into the ravine, and they go off at random heights on the way down, so
-every new world gets its own crater.
-
-To measure this, each temple was generated in the vanilla server with its chunks loaded but not ticking, so
-the golem hadn't dropped yet, and the world was saved. Then the temple was blown up again and again,
-restoring the saved world before each explosion, and the crater was scanned each time.
-
-- Temple at -198 170: deadly after all 20 explosions, and in all 8 test worlds.
-- Temple at 298 -486: deadly after 25 of 30 explosions, and in 9 of 14 test worlds.
-
-At the temple at 298 -486, each time it wasn't deadly a player strafing perfectly in the air could just reach
-one of these:
-
-- a block of ravine wall the TNT chipped at Y 42 or 43, about 2.2 blocks diagonally from the shaft (5 times);
-- a ledge 2 to 3 blocks away at Y 43 to 50, a step in the ravine wall or chipped by the TNT. Those are only
-  in reach when the explosion also blows the shaft open up to Y 57 or higher, which lets the player start
-  steering sooner (3 times);
-- a block of the TNT chamber left right next to the shaft (twice).
-
-Its ravine walls come within reach just below the crater, where the TNT goes off. The ravine under the
-temple at -198 170 is wide open there, so the TNT has nothing within reach to chip.
-
-### Why the fall is deadly
+## Why the fall is deadly
 
 - The player falls from the temple floor (feet at Y=65). Fall damage is the fall distance minus 3, so
   landing on anything at Y 42 or lower is 20+ damage. That kills a player with 20 HP and no armour.
 - Landing in the lava doesn't help either. In shallow lava they hit the bottom at full speed. In deep lava
   they sink and can't climb out before burning.
 - Only water or cobwebs can save them, or a spot to land on at Y 43 or higher.
-- Sprint-strafing in the air they drift at most about 3 blocks sideways by Y=43, and about 7 by the time
-  they reach the lava.
+- Sprint-strafing in the air they drift about 3 blocks sideways by Y=43, and about 8 by the time they reach
+  the lava. How far exactly depends on how high the explosion opens the shaft walls, since they can't leave
+  the shaft before that. In 140 test explosions that was Y 53 to 56, three times Y 57 and once Y 58.
 
-The finder checks everything in that reach:
+## What the finder checks
+
+These rules come from the tests above. The finder takes the shaft to be blown open up to Y 57 (the fifth
+argument of `Main` changes that) and checks everything a player could reach from there:
 
 - nothing to land on at Y 43 or higher. Below that, lava and stone kill alike, so the shaft doesn't have to
   end in lava;
-- at most 5 blocks of ravine wall in reach between Y 42 and 49, below the crater. The TNT that falls into
-  the ravine blows holes into walls that close, and the bottom of every hole is a new ledge. Temples with
-  more of them got a ledge in reach from nearly every explosion: 0 of 13 explosions were deadly at the
-  temple in chunk -32 -18, which has 39 such blocks. The temple at 298 -486 has 4, the one at -198 170 none;
+- no rock at all in reach below the crater, from Y 42 to 50, and open ravine around the chamber at Y 50, so
+  there's nothing for the TNT to blow into a ledge. Temples that fail this left ledges in testing, from 1 in
+  4 explosions to every single one;
+- no ledge in reach from Y 32 to 41 either, where sand or gravel the explosion shakes loose could pile up to
+  a height you can survive landing on. That's what happened twice at the temple at -198 170;
 - no mineshaft (cobwebs, planks);
 - no water. Water springs are placed exactly as the game does, and their flow is simulated over the caves
   and ravines within 4 chunks of the temple. Spring water flooded the ravines under all the earlier seeds
@@ -115,6 +114,12 @@ The finder checks everything in that reach:
 
 Rivers and oceans near the temple change which caves generate, so every result is checked again with a
 port of the game's own 1.16.1 cave and ravine carvers.
+
+Neither temple above passes all of these, so the current finder skips both. A temple that does pass them
+should be deadly however the TNT goes off, but those are rare. Of 178 temples earlier searches found with a
+ravine under the shaft and a deadly fall, 3 pass, and none of those 3 has a dry ravine and a golem that
+drops as well. The finder checks about 750M base seeds a second on 4 cores, so expect days of searching for
+one within 300 blocks of spawn.
 
 ## Earlier seeds: the temple explodes, but the fall is survivable
 
