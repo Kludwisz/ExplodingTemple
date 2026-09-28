@@ -42,3 +42,8 @@ bin/
 .DS_Store
 # Ignore Gradle build output directory
 build
+
+### tools/explosion_test.py ###
+tools/server-1.16.1.jar
+explosion-tests/
+__pycache__/

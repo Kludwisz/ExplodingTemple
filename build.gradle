@@ -1,5 +1,6 @@
 plugins {
     id("java")
+    id("application")
 }
 
 group = "com.kris.seedfinding"
@@ -24,4 +25,11 @@ dependencies {
     implementation files('lib/profotoce59-1.0-SNAPSHOT.jar')
 
     implementation("dev.xpple:cubiomes:0.0.0-2026.5.18.1779128583+1a0c27a6b80f6bebbfe18b806af70fe18f33d0c4")
+}
+
+// gradlew run --args="seedMin seedMax maxSpawnDistance [threads] [worstShaftExit]", see Main
+application {
+    mainClass = "Main"
+    // cubiomes calls its native library through Java's foreign function API
+    applicationDefaultJvmArgs = ["--enable-native-access=ALL-UNNAMED"]
 }
