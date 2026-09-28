@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.IntStream;
 
 public class ExplodingTempleFinder {
     public static final AtomicInteger resultCount = new AtomicInteger(0);
@@ -46,6 +47,13 @@ public class ExplodingTempleFinder {
             GOLEM_ROTATION[offset[0] + 2][offset[1] + 2] = offset[2];
         }
     }
+
+    // The last 3 bits of a nextInt(24) are bits 17-19 of the LCG state, which only depend on the low 20 bits of the
+    // seed as the LCG never carries downwards. So the low 20 bits of a base seed already rule out the 7/8 whose
+    // outpost to temple offset can't be any of the golem offsets, even mod 8. These are the rest, in order.
+    private static final int LOW_BITS = 20;
+    private static final int[] PROMISING_LOW_BITS = promisingLowBits(
+            new PillagerOutpost(MCVersion.v1_16_1).getSalt(), new DesertPyramid(MCVersion.v1_16_1).getSalt());
 
     // 1.16 puts the world spawn in a random spawn biome cell within 256 blocks of (0,0), then spirals
     // out chunk by chunk from there for a grass block (almost always found in the first chunk)
@@ -101,31 +109,53 @@ public class ExplodingTempleFinder {
         int templeSalt = temple.getSalt();
 
         try (CubiomesBiomeChecker biomes = new CubiomesBiomeChecker()) {
-            for (long baseSeed = seedMin; baseSeed < seedMax; baseSeed++) {
-                // Positions in region (0,0) without the outpost start checks - those depend on the region shift,
-                // so they are only checked for the shifted seeds. Same as rand.setRegionSeed(baseSeed, 0, 0, salt,
-                // version) followed by nextInt(24) for x and z, inlined as this runs for every base seed, with x
-                // compared first as most seeds already fail there.
-                long outpostState = nextState((baseSeed + outpostSalt ^ LCG_MULTIPLIER) & Mth.MASK_48);
-                long templeState = nextState((baseSeed + templeSalt ^ LCG_MULTIPLIER) & Mth.MASK_48);
-                int outpostX = nextInt24(outpostState);
-                int templeX = nextInt24(templeState);
-                int offsetX = templeX - outpostX;
-                if (outpostX < 0 || templeX < 0 || offsetX < -2 || offsetX > 2) continue;
+            for (long high = seedMin >>> LOW_BITS; high <= (seedMax - 1) >>> LOW_BITS; high++) {
+                for (int low : PROMISING_LOW_BITS) {
+                    long baseSeed = high << LOW_BITS | low;
+                    if (baseSeed < seedMin || baseSeed >= seedMax) continue;
 
-                outpostState = nextState(outpostState);
-                templeState = nextState(templeState);
-                int outpostZ = nextInt24(outpostState);
-                int templeZ = nextInt24(templeState);
-                int offsetZ = templeZ - outpostZ;
-                if (outpostZ < 0 || templeZ < 0 || offsetZ < -2 || offsetZ > 2
-                        || GOLEM_ROTATION[offsetX + 2][offsetZ + 2] < 0) { continue; }
+                    // Positions in region (0,0) without the outpost start checks - those depend on the region shift,
+                    // so they are only checked for the shifted seeds. Same as rand.setRegionSeed(baseSeed, 0, 0,
+                    // salt, version) followed by nextInt(24) for x and z, inlined as this runs for every base seed,
+                    // with x compared first as most seeds already fail there.
+                    long outpostState = nextState((baseSeed + outpostSalt ^ LCG_MULTIPLIER) & Mth.MASK_48);
+                    long templeState = nextState((baseSeed + templeSalt ^ LCG_MULTIPLIER) & Mth.MASK_48);
+                    int outpostX = nextInt24(outpostState);
+                    int templeX = nextInt24(templeState);
+                    int offsetX = templeX - outpostX;
+                    if (outpostX < 0 || templeX < 0 || offsetX < -2 || offsetX > 2) continue;
 
-                CPos outpostChunk = new CPos(outpostX, outpostZ);
-                checkRegionShifts(baseSeed, outpostChunk, outpostChunk.add(offsetX, offsetZ),
-                        GOLEM_ROTATION[offsetX + 2][offsetZ + 2], biomes);
+                    outpostState = nextState(outpostState);
+                    templeState = nextState(templeState);
+                    int outpostZ = nextInt24(outpostState);
+                    int templeZ = nextInt24(templeState);
+                    int offsetZ = templeZ - outpostZ;
+                    if (outpostZ < 0 || templeZ < 0 || offsetZ < -2 || offsetZ > 2
+                            || GOLEM_ROTATION[offsetX + 2][offsetZ + 2] < 0) { continue; }
+
+                    CPos outpostChunk = new CPos(outpostX, outpostZ);
+                    checkRegionShifts(baseSeed, outpostChunk, outpostChunk.add(offsetX, offsetZ),
+                            GOLEM_ROTATION[offsetX + 2][offsetZ + 2], biomes);
+                }
             }
         }
+    }
+
+    private static int[] promisingLowBits(int outpostSalt, int templeSalt) {
+        boolean[][] golemOffsetMod8 = new boolean[8][8];
+        for (int[] offset : GOLEM_OFFSETS) {
+            golemOffsetMod8[offset[0] & 7][offset[1] & 7] = true;
+        }
+        int mask = (1 << LOW_BITS) - 1;
+        return IntStream.rangeClosed(0, mask).filter(low -> {
+            long outpostState = nextState((low + outpostSalt ^ LCG_MULTIPLIER) & mask) & mask;
+            long templeState = nextState((low + templeSalt ^ LCG_MULTIPLIER) & mask) & mask;
+            int offsetX = (int) ((templeState >>> 17) - (outpostState >>> 17)) & 7;
+            outpostState = nextState(outpostState) & mask;
+            templeState = nextState(templeState) & mask;
+            int offsetZ = (int) ((templeState >>> 17) - (outpostState >>> 17)) & 7;
+            return golemOffsetMod8[offsetX][offsetZ];
+        }).toArray();
     }
 
     // one step of the java.util.Random LCG
