@@ -282,51 +282,49 @@ public class ExplodingTempleFinder {
                             CarveRegion carve, DeadlyFall fall) {
         structureSeedCount.incrementAndGet();
         System.out.printf("got a candidate structure seed: %d (temple chunk %d %d, closest wall below the crater"
-                        + " %s blocks beyond reach)%n", structureSeed, templePos.getX(), templePos.getZ(),
-                formatMargin(fall.wallMarginBelowCrater()));
-
-        // spring water floods almost every ravine, so that is ruled out first
-        Dryness dryness = new Dryness(structureSeed, carve, fall);
-        if (!someSisterSeedStaysDry(structureSeed, outpostPos, templePos, biomes, dryness)) {
-            return;
-        }
-        dryStructureSeedCount.incrementAndGet();
+                        + " %s blocks beyond reach), checking its 65536 world seeds%n", structureSeed,
+                templePos.getX(), templePos.getZ(), formatMargin(fall.wallMarginBelowCrater()));
 
         // how many sister seeds get through each check, to see what rules a structure seed out
-        int[] passed = new int[6];
+        Dryness dryness = new Dryness(structureSeed, carve, fall);
+        int[] passed = new int[7];
         BPos shaft = templeShaftCenter(templePos);
         for (long upperBits = 0; upperBits < 1L << 16; upperBits++) {
             long worldSeed = upperBits << 48 | structureSeed;
 
-            // cheap native biome, water and spawn biome checks first
-            if (!hasStructureBiomes(worldSeed, outpostPos, templePos, biomes) || !dryness.staysDry(biomes)) {
+            // cheap native biome, water and spawn biome checks first, spring water floods almost every ravine
+            if (!hasStructureBiomes(worldSeed, outpostPos, templePos, biomes)) {
                 continue;
             }
             passed[0]++;
-            if (horizontalDistance(biomes.estimateSpawn(), shaft) > maxSpawnDistance + SPAWN_ESTIMATE_SLACK) {
+            if (!dryness.staysDry(biomes)) {
                 continue;
             }
             passed[1]++;
+            if (horizontalDistance(biomes.estimateSpawn(), shaft) > maxSpawnDistance + SPAWN_ESTIMATE_SLACK) {
+                continue;
+            }
+            passed[2]++;
 
             BiomeSource obs = BiomeSource.of(Dimension.OVERWORLD, version, worldSeed);
             if (!temple.canSpawn(templePos, obs) || !outpost.canSpawn(outpostPos, obs)) {
                 continue;
             }
-            passed[2]++;
+            passed[3]++;
 
             TerrainGenerator otg = TerrainGenerator.of(obs);
             Optional<BlockBox> golem = findDroppingGolem(otg, outpostPos, templePos);
             if (golem.isEmpty()) {
                 continue;
             }
-            passed[3]++;
+            passed[4]++;
 
             BPos spawn = SpawnPoint.getSpawn((OverworldTerrainGenerator) otg);
             double distance = horizontalDistance(spawn, shaft);
             if (distance > maxSpawnDistance) {
                 continue;
             }
-            passed[4]++;
+            passed[5]++;
 
             DeadlyFall vanillaFall = deadlyWithVanillaCarvers(structureSeed, worldSeed, templePos, otg, biomes);
             if (vanillaFall == null) {
@@ -334,30 +332,24 @@ public class ExplodingTempleFinder {
                 continue;
             }
 
-            passed[5]++;
+            passed[6]++;
             resultCount.incrementAndGet();
             System.out.printf("Got full world seed: %d %s | spawn %d %d %d | %.0f blocks from spawn | golem cage Y=%d"
                             + " | lands in %s | closest wall below the crater %s blocks beyond reach%n",
                     worldSeed, Utils.tp(templePos), spawn.getX(), spawn.getY(), spawn.getZ(), distance, golem.get().minY,
                     vanillaFall.landsInLava() ? "lava" : "stone", formatMargin(vanillaFall.wallMarginBelowCrater()));
         }
-        System.out.printf("  dry structure seed %d: sister seeds with the biomes %d, spawn estimate close %d,"
-                        + " structures spawn %d, golem drops %d, spawn close %d, deadly with vanilla carvers %d%n",
-                structureSeed, passed[0], passed[1], passed[2], passed[3], passed[4], passed[5]);
+        if (passed[1] > 0) {
+            dryStructureSeedCount.incrementAndGet();
+        }
+        System.out.printf("  structure seed %d, sister seeds left after each check: biomes %d, dry %d, spawn estimate"
+                        + " close %d, structures spawn %d, golem drops %d, spawn close %d, deadly with vanilla carvers"
+                        + " %d%n", structureSeed, passed[0], passed[1], passed[2], passed[3], passed[4], passed[5],
+                passed[6]);
     }
 
     private static String formatMargin(double margin) {
         return margin > 4 ? "4+" : String.format("%.1f", margin);
-    }
-
-    private static boolean someSisterSeedStaysDry(long structureSeed, CPos outpostPos, CPos templePos,
-                                                  CubiomesBiomeChecker biomes, Dryness dryness) {
-        for (long upperBits = 0; upperBits < 1L << 16; upperBits++) {
-            if (hasStructureBiomes(upperBits << 48 | structureSeed, outpostPos, templePos, biomes) && dryness.staysDry(biomes)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     // The springs only depend on the biome each chunk around the temple decorates with, and sister seeds share a

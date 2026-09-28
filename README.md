@@ -22,8 +22,29 @@ explosion is assumed to blow the walls open at worst (Y 57 by default, 58 is str
 1,856,000,000,000 to 4,131,000,000,000 have been searched already. 281474976710656 is the end of the seed space,
 so the search just runs until you stop it.
 
-It prints a `[progress]` line every minute. `got a candidate structure seed` means a temple whose ravine passes the
-checks, before the water, golem and spawn checks for its 65536 sister seeds. Each result is a line like
+Keep the spawn distance at a few hundred blocks and pick the closest result, since every result says how far it is.
+The game looks for grass to put the spawn on, so few world seeds have it right next to a desert temple: the best
+temple found so far has 314 world seeds with the spawn within 300 blocks and none within 150. A small distance
+also leaves fewer temples to check, about a third as many at 50 as at 300.
+
+It prints a `[progress]` line every minute. `got a candidate structure seed` is not a result yet. A structure seed
+only decides where the structures and caves go, the biomes come from the whole world seed, and 65536 world seeds
+share each structure seed. Typed into Minecraft, the structure seed is just one of them, which almost never has a
+desert where the temple goes. So the finder checks all 65536 and prints how many get through each check in turn:
+
+```
+  structure seed 6982474136324, sister seeds left after each check: biomes 4687, dry 0, spawn estimate close 0, structures spawn 0, golem drops 0, spawn close 0, deadly with vanilla carvers 0
+```
+
+- `biomes`: a desert at the temple and an outpost biome at the outpost
+- `dry`: no spring water flows into the fall (here water floods the ravine in all 4687)
+- `spawn estimate close`, `structures spawn`: quick versions of the spawn and biome checks
+- `golem drops`: built on the real terrain, the outpost puts its golem low enough in the shaft to fall
+- `spawn close`: the world spawn is within the distance you gave
+- `deadly with vanilla carvers`: still deadly with the game's own caves. These are the results
+
+Water rules out most candidates and the golem most of the rest; in past searches about 1 candidate in 100 had
+world seeds. Each result is a line like
 
 ```
 Got full world seed: -5722945821321355046 /tp -208 100 160 | spawn 0 71 14 | 252 blocks from spawn | ...
