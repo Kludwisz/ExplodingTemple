@@ -22,10 +22,11 @@ explosion is assumed to blow the walls open at worst (Y 57 by default, 58 is str
 1,856,000,000,000 to 4,131,000,000,000 have been searched already. 281474976710656 is the end of the seed space,
 so the search just runs until you stop it.
 
-Keep the spawn distance at a few hundred blocks and pick the closest result, since every result says how far it is.
-The game looks for grass to put the spawn on, so few world seeds have it right next to a desert temple: the best
-temple found so far has 314 world seeds with the spawn within 300 blocks and none within 150. A small distance
-also leaves fewer temples to check, about a third as many at 50 as at 300.
+A close spawn mostly comes with a temple close to 0 0, as the game puts the spawn within about 270 blocks of it. Of
+the 9 temples earlier searches found world seeds for, the 2 within 150 blocks of 0 0 had world seeds with the spawn
+within 50 blocks, and the 7 further out had none within 100. So with a small spawn distance the finder only checks
+temples near 0 0: with 50 it gets through base seeds about 1.7 times as fast as with 300, but finds fewer temples.
+Every result says how far the spawn is.
 
 It prints a `[progress]` line every minute. `got a candidate structure seed` is not a result yet. A structure seed
 only decides where the structures and caves go, the biomes come from the whole world seed, and 65536 world seeds

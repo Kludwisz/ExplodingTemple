@@ -301,7 +301,7 @@ public class ExplodingTempleFinder {
                 continue;
             }
             passed[1]++;
-            if (horizontalDistance(biomes.estimateSpawn(), shaft) > maxSpawnDistance + SPAWN_ESTIMATE_SLACK) {
+            if (!spawnCanBeClose(biomes.estimateSpawn(), shaft)) {
                 continue;
             }
             passed[2]++;
@@ -346,6 +346,13 @@ public class ExplodingTempleFinder {
                         + " close %d, structures spawn %d, golem drops %d, spawn close %d, deadly with vanilla carvers"
                         + " %d%n", structureSeed, passed[0], passed[1], passed[2], passed[3], passed[4], passed[5],
                 passed[6]);
+    }
+
+    // With no spawn biome within 256 blocks the game spirals out from 0 0 for grass instead, and cubiomes estimates
+    // 8 8, but in a desert the nearest grass can be 90 blocks from there, so then only the real spawn tells
+    private boolean spawnCanBeClose(BPos estimate, BPos shaft) {
+        boolean noSpawnBiome = estimate.getX() == 8 && estimate.getZ() == 8;
+        return noSpawnBiome || horizontalDistance(estimate, shaft) <= maxSpawnDistance + SPAWN_ESTIMATE_SLACK;
     }
 
     private static String formatMargin(double margin) {
