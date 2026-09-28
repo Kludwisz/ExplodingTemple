@@ -73,10 +73,6 @@ public class ExplodingTempleFinder {
     private static final int PYRAMID_SIZE = 21;
     private static final int PYRAMID_FILL_TOP = 59;
 
-    // The TNT that gets knocked into the ravine chips ledges into walls close to the shaft. Temples with more wall
-    // blocks than this in reach below the crater got a ledge from nearly every explosion in the vanilla server.
-    private static final int MAX_WALL_BLOCKS_BELOW_CRATER = 5;
-
     // outposts and desert pyramids both have one attempt per 32x32 chunk region
     private static final int REGION_CHUNKS = 32;
 
@@ -246,15 +242,16 @@ public class ExplodingTempleFinder {
         return CubiomesRavineGenerator.canyonGivesRequiredAir(structureSeed, targetAirList, targetSolidList);
     }
 
-    // The fall's shape: nothing to land on, no walls close below the crater for the TNT to chip ledges into, and no
-    // mineshaft in reach. Adds the pyramid and the mineshafts to the carve, and returns null if the fall isn't deadly.
+    // The fall's shape: nothing to land on, even in the worst case after the explosion (see DeadlyFall#isRobust),
+    // and no mineshaft in reach. Adds the pyramid and the mineshafts to the carve, and returns null if the fall isn't
+    // deadly.
     private static DeadlyFall deadlyFall(long structureSeed, CPos templePos, CarveRegion carve) {
         // the pyramid's sandstone base and the columns it fills under it (sandstone never holds springs)
         int pyramidX = templePos.getX() << 4, pyramidZ = templePos.getZ() << 4;
         carve.fillBox(pyramidX, PYRAMID_FILL_TOP + 1, pyramidZ, pyramidX + PYRAMID_SIZE - 1, 64, pyramidZ + PYRAMID_SIZE - 1);
         carve.fillColumnsDown(pyramidX, pyramidZ, PYRAMID_SIZE, PYRAMID_FILL_TOP);
         DeadlyFall fall = new DeadlyFall(carve, templePos);
-        if (!fall.hasNoSurvivableLedge() || fall.wallBlocksBelowCrater() > MAX_WALL_BLOCKS_BELOW_CRATER) {
+        if (!fall.hasNoSurvivableLedge() || !fall.isRobust()) {
             return null;
         }
 
@@ -284,9 +281,9 @@ public class ExplodingTempleFinder {
     private void finalCheck(long structureSeed, CPos outpostPos, CPos templePos, CubiomesBiomeChecker biomes,
                             CarveRegion carve, DeadlyFall fall) {
         structureSeedCount.incrementAndGet();
-        System.out.println("got a candidate structure seed: " + structureSeed
-                + " (temple chunk " + templePos.getX() + " " + templePos.getZ() + ", " + fall.wallBlocksInReach()
-                + " wall blocks in reach, " + fall.wallBlocksBelowCrater() + " below the crater)");
+        System.out.printf("got a candidate structure seed: %d (temple chunk %d %d, closest wall below the crater"
+                        + " %s blocks beyond reach)%n", structureSeed, templePos.getX(), templePos.getZ(),
+                formatMargin(fall.wallMarginBelowCrater()));
 
         // spring water floods almost every ravine, so that is ruled out first
         Dryness dryness = new Dryness(structureSeed, carve, fall);
@@ -340,14 +337,17 @@ public class ExplodingTempleFinder {
             passed[5]++;
             resultCount.incrementAndGet();
             System.out.printf("Got full world seed: %d %s | spawn %d %d %d | %.0f blocks from spawn | golem cage Y=%d"
-                            + " | lands in %s | %d wall blocks in reach, %d below the crater%n",
+                            + " | lands in %s | closest wall below the crater %s blocks beyond reach%n",
                     worldSeed, Utils.tp(templePos), spawn.getX(), spawn.getY(), spawn.getZ(), distance, golem.get().minY,
-                    vanillaFall.landsInLava() ? "lava" : "stone", vanillaFall.wallBlocksInReach(),
-                    vanillaFall.wallBlocksBelowCrater());
+                    vanillaFall.landsInLava() ? "lava" : "stone", formatMargin(vanillaFall.wallMarginBelowCrater()));
         }
         System.out.printf("  dry structure seed %d: sister seeds with the biomes %d, spawn estimate close %d,"
                         + " structures spawn %d, golem drops %d, spawn close %d, deadly with vanilla carvers %d%n",
                 structureSeed, passed[0], passed[1], passed[2], passed[3], passed[4], passed[5]);
+    }
+
+    private static String formatMargin(double margin) {
+        return margin > 4 ? "4+" : String.format("%.1f", margin);
     }
 
     private static boolean someSisterSeedStaysDry(long structureSeed, CPos outpostPos, CPos templePos,

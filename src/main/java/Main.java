@@ -5,15 +5,17 @@ import java.util.concurrent.atomic.AtomicLong;
 public class Main {
     private static final long BLOCK_SIZE = 1L << 22;
 
-    // args: [seedMin] [seedMax] [maxSpawnDistance] [threads]
+    // args: [seedMin] [seedMax] [maxSpawnDistance] [threads] [worstShaftExit]
     public static void main(String[] args) throws InterruptedException {
         long seedMin = args.length > 0 ? Long.parseLong(args[0]) : 0L;
         long seedMax = args.length > 1 ? Long.parseLong(args[1]) : 1L << 40;
         int maxSpawnDistance = args.length > 2 ? Integer.parseInt(args[2]) : 300;
         int threads = args.length > 3 ? Integer.parseInt(args[3]) : Runtime.getRuntime().availableProcessors();
+        int worstShaftExit = args.length > 4 ? Integer.parseInt(args[4]) : DeadlyFall.DEFAULT_WORST_SHAFT_EXIT;
+        DeadlyFall.setWorstShaftExit(worstShaftExit);
 
-        System.out.printf("base seeds [%d, %d), temple within %d blocks of spawn, %d threads%n",
-                seedMin, seedMax, maxSpawnDistance, threads);
+        System.out.printf("base seeds [%d, %d), temple within %d blocks of spawn, %d threads, deadly with the shaft"
+                + " blown open up to Y=%d%n", seedMin, seedMax, maxSpawnDistance, threads, worstShaftExit);
 
         long t0 = System.nanoTime();
         AtomicLong nextBlock = new AtomicLong(seedMin);

@@ -27,13 +27,29 @@ public class DeadlyFall {
     // How far a player's position can get from the shaft by the time their feet pass each Y, strafing at full sprint
     // air speed (0.026/tick, 0.91 drag, LivingEntity#travel) from leaving the shaft - taken as Y=57 since the
     // explosion blows the lower shaft walls away - with the 0.22 blocks/tick they can build up inside it.
-    private static final double[] REACH = new double[66];
+    private static final double[] REACH = reach(57.0, 0.22);
+    // The farthest they could get. Sprint strafing in the air tops out at 0.29 blocks/tick, but crossing the 3x3
+    // shaft without hitting a wall on the way down they can leave it at 0.26 at most. When they can leave it depends
+    // on how high the explosion opens the shaft walls: in 140 test explosions at three temples that was Y=53 to 56,
+    // three times Y=57 and once Y=58. TNT knocked up the shaft could open it higher still, rarely.
+    public static final int DEFAULT_WORST_SHAFT_EXIT = 57;
+    private static double[] WORST_REACH = reach(DEFAULT_WORST_SHAFT_EXIT, 0.26);
+    // a tenth of a block more than that, like the in-game check
+    private static final double REACH_MARGIN = 0.1;
+    // how high sand or gravel shaken loose by the explosion could pile up on a ledge
+    private static final int MAX_PILE = 10;
 
-    static {
-        double y = 65.0, vy = 0.0, vh = 0.22, drift = 0.0;
+    // how high up the shaft isRobust assumes the explosion can open the walls, set before any search starts
+    public static void setWorstShaftExit(int y) {
+        WORST_REACH = reach(y, 0.26);
+    }
+
+    private static double[] reach(double exitY, double exitSpeed) {
+        double[] reach = new double[66];
+        double y = 65.0, vy = 0.0, vh = exitSpeed, drift = 0.0;
         int height = 65;
         while (height >= 0) {
-            if (y <= 57.0) {
+            if (y <= exitY) {
                 vh += 0.026;
                 drift += vh;
                 vh *= 0.91;
@@ -41,9 +57,10 @@ public class DeadlyFall {
             y += vy;
             vy = (vy - 0.08) * 0.98;
             for (; height >= 0 && y <= height; height--) {
-                REACH[height] = drift;
+                reach[height] = drift;
             }
         }
+        return reach;
     }
 
     private final CarveRegion carve;
@@ -66,30 +83,65 @@ public class DeadlyFall {
         return true;
     }
 
-    // Solid blocks within reach while the fall is still survivable. None of them has air above it, but the TNT
-    // blows bits out of the walls when it goes off, and any of these could end up as a ledge.
-    public int wallBlocksInReach() {
-        return wallBlocksInReach(LOWEST_SURVIVABLE_FEET_Y, CRATER_TOP + 2);
-    }
-
-    // The same, only below the crater. The TNT that gets knocked into the ravine goes off down there and chips
-    // ledges into walls this close, while the higher ones are mostly the chamber it blows away.
-    public int wallBlocksBelowCrater() {
-        return wallBlocksInReach(LOWEST_SURVIVABLE_FEET_Y, CRATER_BOTTOM + 1);
-    }
-
-    private int wallBlocksInReach(int minFeetY, int maxFeetY) {
-        int count = 0;
-        for (int feetY = minFeetY; feetY <= maxFeetY; feetY++) {
-            int range = (int) Math.ceil(REACH[feetY] + PLAYER_HALF_WIDTH) + 2;
+    // Whether the fall stays deadly however the TNT goes off. The TNT the first explosion knocks into the ravine goes
+    // off below the crater and blows holes into any rock close by, and the bottom of a hole is a ledge. So below the
+    // crater there must be no rock at all within the farthest the player could ever steer. Around the chamber the
+    // rock has to start above Y=50, so that whatever the explosion blows out of it has nothing underneath. There
+    // must be no ledge in that reach to begin with, and none a little below it where loose sand and gravel could
+    // pile up.
+    public boolean isRobust() {
+        for (int feetY = LOWEST_SURVIVABLE_FEET_Y; feetY <= CRATER_BOTTOM + 2; feetY++) {
+            double reach = WORST_REACH[feetY] + REACH_MARGIN;
+            int range = (int) Math.ceil(reach) + 1;
             for (int x = shaftMinX - range; x <= shaftMinX + 2 + range; x++) {
                 for (int z = shaftMinZ - range; z <= shaftMinZ + 2 + range; z++) {
-                    if (distanceToShaft(x, z) > REACH[feetY] + PLAYER_HALF_WIDTH) continue;
-                    if (!isAir(x, feetY - 1, z)) count++;
+                    if (need(x, z) > reach) continue;
+                    int y = feetY - 1;
+                    // the chamber's floor, which the explosion blows away
+                    if (y == CRATER_BOTTOM + 1 && isChamber(x, z)) continue;
+                    if (!carve.isCarved(x, y, z)) return false;
                 }
             }
         }
-        return count;
+        // Sand and gravel the explosion shakes loose fall straight down and pile up where they land. A pile on a
+        // ledge a little below Y=42 can reach up to where landing is survivable (2 of 100 test explosions at one
+        // temple piled gravel 3 high on a ledge at Y=39), so there must be no ledge that close below it either.
+        double pileReach = WORST_REACH[LOWEST_SURVIVABLE_FEET_Y] + REACH_MARGIN;
+        int pileRange = (int) Math.ceil(pileReach) + 1;
+        for (int y = LOWEST_SURVIVABLE_FEET_Y - 1 - MAX_PILE; y < LOWEST_SURVIVABLE_FEET_Y - 1; y++) {
+            for (int x = shaftMinX - pileRange; x <= shaftMinX + 2 + pileRange; x++) {
+                for (int z = shaftMinZ - pileRange; z <= shaftMinZ + 2 + pileRange; z++) {
+                    if (need(x, z) <= pileReach && !carve.isCarved(x, y, z)) return false;
+                }
+            }
+        }
+        for (int feetY = LOWEST_SURVIVABLE_FEET_Y; feetY <= CRATER_TOP + 3; feetY++) {
+            double reach = WORST_REACH[feetY] + REACH_MARGIN;
+            int range = (int) Math.ceil(reach) + 1;
+            for (int x = shaftMinX - range; x <= shaftMinX + 2 + range; x++) {
+                for (int z = shaftMinZ - range; z <= shaftMinZ + 2 + range; z++) {
+                    if (need(x, z) <= reach && isAir(x, feetY, z) && !isAir(x, feetY - 1, z)) return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    // How much farther than the worst-case reach the closest rock below the crater is, in blocks (the smallest
+    // margin over Y=42 to 50 with the chamber floor left out). isRobust needs at least REACH_MARGIN.
+    public double wallMarginBelowCrater() {
+        double margin = Double.MAX_VALUE;
+        for (int feetY = LOWEST_SURVIVABLE_FEET_Y; feetY <= CRATER_BOTTOM + 2; feetY++) {
+            int range = (int) Math.ceil(WORST_REACH[feetY]) + 4;
+            for (int x = shaftMinX - range; x <= shaftMinX + 2 + range; x++) {
+                for (int z = shaftMinZ - range; z <= shaftMinZ + 2 + range; z++) {
+                    int y = feetY - 1;
+                    if (y == CRATER_BOTTOM + 1 && isChamber(x, z)) continue;
+                    if (!carve.isCarved(x, y, z)) margin = Math.min(margin, need(x, z) - WORST_REACH[feetY]);
+                }
+            }
+        }
+        return margin;
     }
 
     // nothing within reach to land on high enough to survive the fall
@@ -132,9 +184,25 @@ public class DeadlyFall {
     }
 
     private boolean isAir(int x, int y, int z) {
-        if (y > LAVA_LEVEL && carve.isCarved(x, y, z)) return true;
-        return y >= CRATER_BOTTOM && y <= CRATER_TOP
-                && x >= shaftMinX - 1 && x <= shaftMinX + 3 && z >= shaftMinZ - 1 && z <= shaftMinZ + 3;
+        if (isChamber(x, z)) {
+            // the crater, and above it the 3x3 shaft inside its sandstone walls up to the floor
+            if (y >= CRATER_BOTTOM && y <= CRATER_TOP) return true;
+            if (y > CRATER_TOP && y < 64) return x >= shaftMinX && x <= shaftMinX + 2 && z >= shaftMinZ && z <= shaftMinZ + 2;
+        }
+        return y > LAVA_LEVEL && carve.isCarved(x, y, z);
+    }
+
+    // the chamber and the blocks around it that the explosion blows away, 5x5 around the shaft
+    private boolean isChamber(int x, int z) {
+        return x >= shaftMinX - 1 && x <= shaftMinX + 3 && z >= shaftMinZ - 1 && z <= shaftMinZ + 3;
+    }
+
+    // How far the player's position has to move from anywhere in the shaft for their 0.6 wide hitbox to overlap
+    // the block column, horizontally in any direction.
+    private double need(int x, int z) {
+        double dx = Math.max(0, Math.max(shaftMinX - x - 1.0, x - shaftMinX - 3.0));
+        double dz = Math.max(0, Math.max(shaftMinZ - z - 1.0, z - shaftMinZ - 3.0));
+        return Math.hypot(dx, dz);
     }
 
     // distance from a block column to the positions a player can have inside the shaft
