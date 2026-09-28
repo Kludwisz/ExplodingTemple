@@ -69,8 +69,18 @@ public class DeadlyFall {
     // Solid blocks within reach while the fall is still survivable. None of them has air above it, but the TNT
     // blows bits out of the walls when it goes off, and any of these could end up as a ledge.
     public int wallBlocksInReach() {
+        return wallBlocksInReach(LOWEST_SURVIVABLE_FEET_Y, CRATER_TOP + 2);
+    }
+
+    // The same, only below the crater. The TNT that gets knocked into the ravine goes off down there and chips
+    // ledges into walls this close, while the higher ones are mostly the chamber it blows away.
+    public int wallBlocksBelowCrater() {
+        return wallBlocksInReach(LOWEST_SURVIVABLE_FEET_Y, CRATER_BOTTOM + 1);
+    }
+
+    private int wallBlocksInReach(int minFeetY, int maxFeetY) {
         int count = 0;
-        for (int feetY = LOWEST_SURVIVABLE_FEET_Y; feetY <= CRATER_TOP + 2; feetY++) {
+        for (int feetY = minFeetY; feetY <= maxFeetY; feetY++) {
             int range = (int) Math.ceil(REACH[feetY] + PLAYER_HALF_WIDTH) + 2;
             for (int x = shaftMinX - range; x <= shaftMinX + 2 + range; x++) {
                 for (int z = shaftMinZ - range; z <= shaftMinZ + 2 + range; z++) {
