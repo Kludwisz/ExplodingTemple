@@ -13,8 +13,9 @@ import com.seedfinding.mcmath.util.Mth;
 import com.seedfinding.mcterrain.TerrainGenerator;
 import com.seedfinding.mcterrain.terrain.OverworldTerrainGenerator;
 import generator.CubiomesBiomeChecker;
-import generator.CubiomesCarveRegion;
+import generator.CarveRegion;
 import generator.CubiomesRavineGenerator;
+import generator.VanillaCarver;
 import profotoce59.generator.OutpostGenerator;
 
 import java.util.ArrayList;
@@ -162,24 +163,11 @@ public class ExplodingTempleFinder {
                 }
                 ravineCount.incrementAndGet();
 
-                CubiomesCarveRegion carve = new CubiomesCarveRegion(structureSeed, shiftedTemple, CARVE_CHUNK_RADIUS);
-                // the pyramid's sandstone base and the columns it fills under it (sandstone never holds springs)
-                int pyramidX = shiftedTemple.getX() << 4, pyramidZ = shiftedTemple.getZ() << 4;
-                carve.fillBox(pyramidX, PYRAMID_FILL_TOP + 1, pyramidZ, pyramidX + PYRAMID_SIZE - 1, 64, pyramidZ + PYRAMID_SIZE - 1);
-                carve.fillColumnsDown(pyramidX, pyramidZ, PYRAMID_SIZE, PYRAMID_FILL_TOP);
-                DeadlyFall fall = new DeadlyFall(carve, shiftedTemple);
-                if (!fall.hasLavaPoolAndOpenFall() || !fall.hasNoSurvivableLedge()) {
-                    continue;
+                CarveRegion carve = CarveRegion.cubiomes(structureSeed, shiftedTemple, CARVE_CHUNK_RADIUS);
+                DeadlyFall fall = deadlyFall(structureSeed, shiftedTemple, carve);
+                if (fall != null) {
+                    finalCheck(structureSeed, shiftedOutpost, shiftedTemple, biomes, carve, fall);
                 }
-
-                var mineshafts = Mineshafts.near(structureSeed, shiftedTemple, CARVE_CHUNK_RADIUS);
-                if (!fall.isClearOf(mineshafts)) {
-                    continue;
-                }
-                // mineshaft air can hold springs and lead their water into the ravine
-                mineshafts.forEach(box -> carve.carve(box.x0(), box.y0(), box.z0(), box.x1(), box.y1(), box.z1()));
-
-                finalCheck(structureSeed, shiftedOutpost, shiftedTemple, biomes, carve, fall);
             }
         }
     }
@@ -222,8 +210,42 @@ public class ExplodingTempleFinder {
         return CubiomesRavineGenerator.canyonGivesRequiredAir(structureSeed, targetAirList, targetSolidList);
     }
 
+    // The fall's shape: lava and open air under the shaft, nothing to land on and no mineshaft in reach. Adds the
+    // pyramid and the mineshafts to the carve, and returns null if the fall isn't deadly.
+    private static DeadlyFall deadlyFall(long structureSeed, CPos templePos, CarveRegion carve) {
+        // the pyramid's sandstone base and the columns it fills under it (sandstone never holds springs)
+        int pyramidX = templePos.getX() << 4, pyramidZ = templePos.getZ() << 4;
+        carve.fillBox(pyramidX, PYRAMID_FILL_TOP + 1, pyramidZ, pyramidX + PYRAMID_SIZE - 1, 64, pyramidZ + PYRAMID_SIZE - 1);
+        carve.fillColumnsDown(pyramidX, pyramidZ, PYRAMID_SIZE, PYRAMID_FILL_TOP);
+        DeadlyFall fall = new DeadlyFall(carve, templePos);
+        if (!fall.hasLavaPoolAndOpenFall() || !fall.hasNoSurvivableLedge()) {
+            return null;
+        }
+
+        var mineshafts = Mineshafts.near(structureSeed, templePos, CARVE_CHUNK_RADIUS);
+        if (!fall.isClearOf(mineshafts)) {
+            return null;
+        }
+        // mineshaft air can hold springs and lead their water into the ravine
+        mineshafts.forEach(box -> carve.carve(box.x0(), box.y0(), box.z0(), box.x1(), box.y1(), box.z1()));
+        return fall;
+    }
+
+    // Cubiomes carves caves the game skips next to rivers and oceans, which is where the golem drops (the ground
+    // has to be at sea level), so every result is checked again with the game's own carvers and terrain.
+    private static boolean deadlyWithVanillaCarvers(long structureSeed, long worldSeed, CPos templePos,
+                                                    TerrainGenerator terrain, CubiomesBiomeChecker biomes) {
+        CarveRegion carve = VanillaCarver.carve(worldSeed, templePos, CARVE_CHUNK_RADIUS, terrain, biomes::getCarverBiome);
+        DeadlyFall fall = deadlyFall(structureSeed, templePos, carve);
+        if (fall == null) {
+            return false;
+        }
+        var springs = WaterSprings.predict(structureSeed, carve, biomes::getStructureBiome);
+        return fall.staysDry(WaterSprings.flow(springs, carve));
+    }
+
     private void finalCheck(long structureSeed, CPos outpostPos, CPos templePos, CubiomesBiomeChecker biomes,
-                            CubiomesCarveRegion carve, DeadlyFall fall) {
+                            CarveRegion carve, DeadlyFall fall) {
         structureSeedCount.incrementAndGet();
         System.out.println("got a candidate structure seed: " + structureSeed
                 + " (temple chunk " + templePos.getX() + " " + templePos.getZ() + ")");
@@ -264,6 +286,11 @@ public class ExplodingTempleFinder {
                 continue;
             }
 
+            if (!deadlyWithVanillaCarvers(structureSeed, worldSeed, templePos, otg, biomes)) {
+                System.out.println("  " + worldSeed + " is only deadly with the cubiomes carvers");
+                continue;
+            }
+
             resultCount.incrementAndGet();
             System.out.printf("Got full world seed: %d %s | spawn %d %d %d | %.0f blocks from spawn | golem cage Y=%d%n",
                     worldSeed, Utils.tp(templePos), spawn.getX(), spawn.getY(), spawn.getZ(), distance, golem.get().minY);
@@ -284,11 +311,11 @@ public class ExplodingTempleFinder {
     // few hundred layouts at most, so the water is only simulated once per layout.
     private static final class Dryness {
         private final long structureSeed;
-        private final CubiomesCarveRegion carve;
+        private final CarveRegion carve;
         private final DeadlyFall fall;
         private final Map<String, Boolean> byLayout = new HashMap<>();
 
-        Dryness(long structureSeed, CubiomesCarveRegion carve, DeadlyFall fall) {
+        Dryness(long structureSeed, CarveRegion carve, DeadlyFall fall) {
             this.structureSeed = structureSeed;
             this.carve = carve;
             this.fall = fall;

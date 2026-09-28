@@ -2,7 +2,7 @@ import com.seedfinding.mccore.rand.ChunkRand;
 import com.seedfinding.mccore.util.pos.BPos;
 import com.seedfinding.mccore.util.pos.CPos;
 import com.seedfinding.mccore.version.MCVersion;
-import generator.CubiomesCarveRegion;
+import generator.CarveRegion;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -42,7 +42,7 @@ public class WaterSprings {
     }
 
     // decorationBiome gives the biome each chunk decorates with (the 1:4 cell at its centre)
-    public static List<BPos> predict(long structureSeed, CubiomesCarveRegion carve, ToIntFunction<CPos> decorationBiome) {
+    public static List<BPos> predict(long structureSeed, CarveRegion carve, ToIntFunction<CPos> decorationBiome) {
         ChunkRand rand = new ChunkRand();
         List<BPos> springs = new ArrayList<>();
         for (int i = 0; i < carve.getWidth(); i++) {
@@ -63,7 +63,7 @@ public class WaterSprings {
         return springs;
     }
 
-    private static boolean isSpring(CubiomesCarveRegion carve, int x, int y, int z) {
+    private static boolean isSpring(CarveRegion carve, int x, int y, int z) {
         if (!isRock(carve, x, y + 1, z) || !isRock(carve, x, y - 1, z)) return false;
         if (!isAir(carve, x, y, z) && !isRock(carve, x, y, z)) return false;
 
@@ -77,12 +77,12 @@ public class WaterSprings {
         return rock == 4 && air == 1;
     }
 
-    private static boolean isRock(CubiomesCarveRegion carve, int x, int y, int z) {
+    private static boolean isRock(CarveRegion carve, int x, int y, int z) {
         return y >= MIN_ROCK_Y && y <= MAX_ROCK_Y && carve.contains(x, z) && !carve.isCarved(x, y, z)
                 && !carve.isFilled(x, y, z);
     }
 
-    private static boolean isAir(CubiomesCarveRegion carve, int x, int y, int z) {
+    private static boolean isAir(CarveRegion carve, int x, int y, int z) {
         return y > LAVA_LEVEL && carve.isCarved(x, y, z);
     }
 
@@ -91,13 +91,20 @@ public class WaterSprings {
     sideways through air, and lava it touches turns into obsidian it can flow over. Vanilla only spreads towards the
     nearest drop within 4 blocks, spreading every way instead only makes this cover more.
      */
-    public static Map<BPos, Integer> flow(List<BPos> springs, CubiomesCarveRegion carve) {
+    public static Map<BPos, Integer> flow(List<BPos> springs, CarveRegion carve) {
         Map<BPos, Integer> water = new HashMap<>();
         ArrayDeque<BPos> queue = new ArrayDeque<>();
         for (BPos spring : springs) {
             water.put(spring, MAX_SPREAD);
             queue.add(spring);
         }
+        // water that was already there (from the terrain, or the underwater carvers in ocean chunks) flows into
+        // any carved air next to it once something updates it, so it counts as a source as well
+        carve.forEachWater((x, y, z) -> {
+            BPos pos = new BPos(x, y, z);
+            water.put(pos, MAX_SPREAD);
+            queue.add(pos);
+        });
 
         while (!queue.isEmpty()) {
             BPos pos = queue.poll();

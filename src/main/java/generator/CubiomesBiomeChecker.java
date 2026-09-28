@@ -30,6 +30,11 @@ public class CubiomesBiomeChecker implements AutoCloseable {
         return Cubiomes.getBiomeAt(generator, 4, (chunk.getX() << 2) + 2, 0, (chunk.getZ() << 2) + 2);
     }
 
+    // the biome whose carvers 1.16 runs when carving this chunk
+    public int getCarverBiome(int chunkX, int chunkZ) {
+        return Cubiomes.getBiomeAt(generator, 4, chunkX << 2, 0, chunkZ << 2);
+    }
+
     // the result of the spawn biome search - the world spawn ends up in (or very close to) this chunk
     public BPos estimateSpawn() {
         MemorySegment pos = Cubiomes.estimateSpawn(posAllocator, generator, MemorySegment.NULL);
@@ -38,6 +43,14 @@ public class CubiomesBiomeChecker implements AutoCloseable {
 
     public static boolean isDesert(int biome) {
         return biome == Cubiomes.desert() || biome == Cubiomes.desert_hills();
+    }
+
+    // the biomes with the ocean carvers (fewer caves, and caves below sea level filled with water)
+    public static boolean isOcean(int biome) {
+        return biome == Cubiomes.ocean() || biome == Cubiomes.deep_ocean() || biome == Cubiomes.frozen_ocean()
+                || biome == Cubiomes.deep_frozen_ocean() || biome == Cubiomes.cold_ocean() || biome == Cubiomes.deep_cold_ocean()
+                || biome == Cubiomes.lukewarm_ocean() || biome == Cubiomes.deep_lukewarm_ocean()
+                || biome == Cubiomes.warm_ocean() || biome == Cubiomes.deep_warm_ocean();
     }
 
     public static boolean isOutpostBiome(int biome) {

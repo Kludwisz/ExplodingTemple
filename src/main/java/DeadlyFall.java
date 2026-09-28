@@ -1,6 +1,6 @@
 import com.seedfinding.mccore.util.pos.BPos;
 import com.seedfinding.mccore.util.pos.CPos;
-import generator.CubiomesCarveRegion;
+import generator.CarveRegion;
 
 import java.util.List;
 import java.util.Map;
@@ -50,11 +50,11 @@ public class DeadlyFall {
         }
     }
 
-    private final CubiomesCarveRegion carve;
+    private final CarveRegion carve;
     private final int shaftMinX;
     private final int shaftMinZ;
 
-    public DeadlyFall(CubiomesCarveRegion carve, CPos templeChunk) {
+    public DeadlyFall(CarveRegion carve, CPos templeChunk) {
         this.carve = carve;
         this.shaftMinX = (templeChunk.getX() << 4) + 9;
         this.shaftMinZ = (templeChunk.getZ() << 4) + 9;
